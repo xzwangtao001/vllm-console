@@ -15,6 +15,16 @@ NC='\033[0m' # No Color
 
 INSTALL_DIR="${1:-/opt/vllm-console}"
 REPO_URL="https://github.com/xzwangtao001/vllm-console.git"
+ENABLE_SYSTEMD="${ENABLE_SYSTEMD:-auto}"  # auto/yes/no
+
+# 解析命令行参数
+for arg in "$@"; do
+    case $arg in
+        --systemd) ENABLE_SYSTEMD="yes" ;;
+        --no-systemd) ENABLE_SYSTEMD="no" ;;
+        --install-dir=*) INSTALL_DIR="${arg#*=}" ;;
+    esac
+done
 
 log_info()  { echo -e "${BLUE}[INFO]${NC} $1"; }
 log_ok()    { echo -e "${GREEN}[✓]${NC} $1"; }
@@ -219,8 +229,20 @@ log_ok "启动脚本配置完成"
 # 7. 创建 systemd 服务（可选）
 # -------------------------------------------------------
 echo ""
-read -p "是否创建 systemd 服务（开机自启）? [y/N]: " -r
-if [[ $REPLY =~ ^[Yy]$ ]]; then
+
+# 判断是否启用 systemd: 优先环境变量/参数, 否则检测当前环境
+if [ "$ENABLE_SYSTEMD" = "auto" ]; then
+    # 默认启用: root + systemd 存在 = 自动开启
+    if [ -d /run/systemd/system ]; then
+        ENABLE_SYSTEMD="yes"
+        log_info "检测到 systemd 环境，自动启用开机自启服务"
+    else
+        ENABLE_SYSTEMD="no"
+        log_info "非 systemd 环境，跳过开机自启"
+    fi
+fi
+
+if [ "$ENABLE_SYSTEMD" = "yes" ]; then
     cat > /etc/systemd/system/vllm-console.service << SYSTEMD_EOF
 [Unit]
 Description=vLLM Console
