@@ -74,6 +74,22 @@ install_if_missing pip3 python3-pip
 install_if_missing node nodejs
 install_if_missing npm npm
 
+# 安装 venv（Python虚拟环境依赖）
+if python3 -c "import venv" 2>/dev/null; then
+    log_ok "python3-venv 已安装"
+else
+    log_warn "python3-venv 未安装，正在安装..."
+    if command -v apt-get &> /dev/null; then
+        apt-get update -qq && apt-get install -y -qq python3-venv 2>&1 | tail -1
+    elif command -v yum &> /dev/null; then
+        yum install -y python3-venv 2>&1 | tail -1
+    else
+        log_error "无法自动安装 python3-venv，请手动安装: sudo apt install python3-venv"
+        exit 1
+    fi
+    log_ok "python3-venv 安装完成"
+fi
+
 # 检查 GPU 驱动（仅提示）
 if command -v nvidia-smi &> /dev/null; then
     GPU_INFO=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || echo "unknown")
