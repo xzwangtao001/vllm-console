@@ -23,8 +23,12 @@ for arg in "$@"; do
         --systemd) ENABLE_SYSTEMD="yes" ;;
         --no-systemd) ENABLE_SYSTEMD="no" ;;
         --install-dir=*) INSTALL_DIR="${arg#*=}" ;;
+        --mirror=*) PIP_MIRROR="${arg#*=}" ;;
     esac
 done
+
+# pip 镜像源（默认阿里云）
+PIP_INDEX_URL="${PIP_MIRROR:-https://mirrors.aliyun.com/pypi/simple/}"
 
 log_info()  { echo -e "${BLUE}[INFO]${NC} $1"; }
 log_ok()    { echo -e "${GREEN}[✓]${NC} $1"; }
@@ -75,16 +79,22 @@ install_if_missing node nodejs
 install_if_missing npm npm
 
 # 安装 venv（Python虚拟环境依赖）
-if python3 -c "import venv" 2>/dev/null; then
+if python3 -c "import ensurepip" 2>/dev/null; then
     log_ok "python3-venv 已安装"
 else
     log_warn "python3-venv 未安装，正在安装..."
+    PYTHON_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
     if command -v apt-get &> /dev/null; then
-        apt-get update -qq && apt-get install -y -qq python3-venv 2>&1 | tail -1
+        apt-get update -qq && apt-get install -y -qq python3-venv "python${PYTHON_VER}-venv" python3-pip 2>&1 | tail -1
     elif command -v yum &> /dev/null; then
-        yum install -y python3-venv 2>&1 | tail -1
+        yum install -y "python${PYTHON_VER}-venv" 2>&1 | tail -1
     else
-        log_error "无法自动安装 python3-venv，请手动安装: sudo apt install python3-venv"
+        log_error "无法自动安装 python3-venv，请手动安装: sudo apt install python3.12-venv"
+        exit 1
+    fi
+    # 验证 ensurepip 现在可用
+    if ! python3 -c "import ensurepip" 2>/dev/null; then
+        log_error "python3-venv 安装失败，请手动安装: sudo apt install python${PYTHON_VER}-venv"
         exit 1
     fi
     log_ok "python3-venv 安装完成"
