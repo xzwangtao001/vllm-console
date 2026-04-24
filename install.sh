@@ -132,7 +132,8 @@ echo ""
 log_info "安装后端依赖..."
 cd "$INSTALL_DIR/backend"
 
-if [ ! -d "venv" ]; then
+if [ ! -f "venv/bin/activate" ]; then
+    rm -rf venv
     python3 -m venv venv
     log_ok "Python 虚拟环境创建完成"
 fi
