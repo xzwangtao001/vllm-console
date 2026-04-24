@@ -43,7 +43,6 @@ class ModelCreate(BaseModel):
     source_type: str = Field(..., pattern="^(huggingface|modelscope|local)$")
     source_repo: str = Field(..., min_length=1)
     source_revision: str = "main"
-    local_path: str = Field(..., min_length=1)
     remark: str = ""
 
 
@@ -52,7 +51,6 @@ class ModelUpdate(BaseModel):
     name: Optional[str] = None
     source_repo: Optional[str] = None
     source_revision: Optional[str] = None
-    local_path: Optional[str] = None
     remark: Optional[str] = None
 
 

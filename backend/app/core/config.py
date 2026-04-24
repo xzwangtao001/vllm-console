@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./data/db/vllm_console.db"
     
     # 目录配置
-    default_model_dir: str = "./data/models"
+    default_model_dir: str = "./data/models"  # 统一模型存储根目录
     default_log_dir: str = "./data/logs"
     
     # Token 配置（可选）

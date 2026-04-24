@@ -122,8 +122,10 @@
             <el-input v-model="addForm.source_revision" placeholder="main" />
           </el-form-item>
           
-          <el-form-item label="本地路径" prop="local_path">
-            <el-input v-model="addForm.local_path" placeholder="/data/models/xxx" />
+          <el-form-item label="存储路径">
+            <el-text type="info" size="small">
+              data/models/{{ addForm.source_type }}/{{ addForm.name || '模型名称' }}
+            </el-text>
           </el-form-item>
           
           <el-form-item label="备注">
@@ -170,7 +172,6 @@ const addForm = reactive({
   source_type: 'huggingface',
   source_repo: '',
   source_revision: 'main',
-  local_path: '',
   remark: '',
 })
 
@@ -178,7 +179,6 @@ const addRules: FormRules = {
   name: [{ required: true, message: '请输入模型名称', trigger: 'blur' }],
   source_type: [{ required: true, message: '请选择来源类型', trigger: 'change' }],
   source_repo: [{ required: true, message: '请输入仓库 ID', trigger: 'blur' }],
-  local_path: [{ required: true, message: '请输入本地路径', trigger: 'blur' }],
 }
 
 const repoPlaceholder = computed(() => {
@@ -242,7 +242,6 @@ async function handleAddSubmit() {
         source_type: 'huggingface',
         source_repo: '',
         source_revision: 'main',
-        local_path: '',
         remark: '',
       })
     } catch (error) {

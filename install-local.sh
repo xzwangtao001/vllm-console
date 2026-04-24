@@ -55,12 +55,17 @@ TMP_ZIP="/tmp/vllm-console.zip"
 log_info "正在下载项目代码..."
 curl -fsSL -o "$TMP_ZIP" "${HTTP_BASE}/vllm-console.zip"
 python3 -c "
-import zipfile, os
+import zipfile
 with zipfile.ZipFile('$TMP_ZIP', 'r') as z:
     z.extractall('/tmp/vllm-extract')
 "
-mv /tmp/vllm-extract/vllm-console-main/* "$INSTALL_DIR"/
-mv /tmp/vllm-extract/vllm-console-main/.gitignore "$INSTALL_DIR"/ 2>/dev/null || true
+# 检测是根目录结构还是子目录结构
+if [ -d "/tmp/vllm-extract/vllm-console-main" ]; then
+    mv /tmp/vllm-extract/vllm-console-main/* "$INSTALL_DIR"/
+    mv /tmp/vllm-extract/vllm-console-main/.git* "$INSTALL_DIR"/ 2>/dev/null || true
+else
+    mv /tmp/vllm-extract/* "$INSTALL_DIR"/
+fi
 rm -rf "$TMP_ZIP" /tmp/vllm-extract
 log_ok "代码下载完成"
 
@@ -72,13 +77,31 @@ cd "$INSTALL_DIR/backend"
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip -q
-pip install -r requirements.txt -q
+pip install --index-url https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn -r requirements.txt -q
 log_ok "后端依赖安装完成"
 
 # 4. 安装 vLLM
 echo ""
-log_info "安装 vLLM 引擎 (v$VLLM_VERSION)..."
-pip install "vllm==$VLLM_VERSION" -q 2>&1 | tail -5
+log_info "安装 vLLM 引擎 (v$VLLM_VERSION) [使用本地离线包]..."
+
+# 尝试从本地服务下载离线包
+WHEEL_URL="${HTTP_BASE}/wheels/vllm-0.19.1-cp38-abi3-manylinux_2_31_x86_64.whl"
+LOCAL_WHEEL="/tmp/vllm-local.whl"
+
+if curl -sf "$WHEEL_URL" -o "$LOCAL_WHEEL"; then
+    log_info "使用离线 wheel 安装 vLLM (速度更快)"
+    pip install --no-deps "$LOCAL_WHEEL"
+    log_ok "vLLM 核心包安装完成"
+    
+    # 补充安装依赖（从清华镜像）
+    log_info "正在安装 vLLM 依赖..."
+    pip install --index-url https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn "vllm[standard]==$VLLM_VERSION" -q 2>&1 | tail -3
+else
+    log_warn "无法获取离线包，将从网络安装..."
+    pip install --index-url https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn "vllm==$VLLM_VERSION" 2>&1 | tail -5
+fi
+
+rm -f "$LOCAL_WHEEL"
 VLLM_ACTUAL=$(pip show vllm 2>/dev/null | grep "^Version:" | awk '{print $2}')
 log_ok "vLLM $VLLM_ACTUAL 安装完成"
 

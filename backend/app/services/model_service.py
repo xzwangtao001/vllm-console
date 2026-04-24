@@ -9,6 +9,18 @@ from sqlalchemy import select, func
 
 from ..models.tables import Model, Task
 from ..schemas.schemas import ModelCreate, ModelUpdate
+from ..core.config import settings
+
+
+def get_model_local_path(model_name: str, source_type: str) -> str:
+    """根据模型名称和来源类型生成统一的本地路径
+    
+    路径格式: {default_model_dir}/{source_type}/{model_name}
+    例如: ./data/models/huggingface/Qwen-Qwen3-8B
+    """
+    # 将模型名称中的斜杠替换为下划线，避免路径冲突
+    safe_name = model_name.replace("/", "-")
+    return os.path.join(settings.default_model_dir, source_type, safe_name)
 
 
 class ModelService:
@@ -106,12 +118,15 @@ class ModelService:
     
     async def create_model(self, data: ModelCreate) -> Dict[str, Any]:
         """创建模型"""
+        # 自动生成统一的本地路径
+        local_path = get_model_local_path(data.name, data.source_type)
+        
         model = Model(
             name=data.name,
             source_type=data.source_type,
             source_repo=data.source_repo,
             source_revision=data.source_revision,
-            local_path=data.local_path,
+            local_path=local_path,
             remark=data.remark,
             status="new",
         )
