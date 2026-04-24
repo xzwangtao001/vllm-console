@@ -34,7 +34,7 @@
         </el-menu-item>
         
         <el-menu-item index="/instances">
-          <el-icon><Server /></el-icon>
+          <el-icon><Monitor /></el-icon>
           <span>实例管理</span>
         </el-menu-item>
         
@@ -72,9 +72,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, useSlots } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Refresh, DataAnalysis, Cpu, Folder, Download, Server, Document, Setting } from '@element-plus/icons-vue'
+import { Refresh, DataAnalysis, Cpu, Folder, Download, Monitor, Document, Setting } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()

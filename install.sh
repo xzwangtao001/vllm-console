@@ -169,10 +169,13 @@ npm run build 2>&1 | tail -3
 log_ok "前端构建完成"
 
 # -------------------------------------------------------
-# 5. 创建日志目录
+# 5. 创建必要目录
 # -------------------------------------------------------
 mkdir -p "$INSTALL_DIR/logs"
-log_ok "日志目录: $INSTALL_DIR/logs"
+mkdir -p "$INSTALL_DIR/backend/data/db"
+mkdir -p "$INSTALL_DIR/backend/data/models"
+mkdir -p "$INSTALL_DIR/backend/data/logs"
+log_ok "数据目录创建完成"
 
 # -------------------------------------------------------
 # 6. 配置服务启动脚本
