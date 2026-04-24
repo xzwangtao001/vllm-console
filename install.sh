@@ -25,6 +25,7 @@ for arg in "$@"; do
         --no-systemd) ENABLE_SYSTEMD="no" ;;
         --install-dir=*) INSTALL_DIR="${arg#*=}" ;;
         --vllm-version=*) VLLM_VERSION="${arg#*=}" ;;
+        --ssh) USE_SSH="yes" ;;
     esac
 done
 
@@ -105,10 +106,33 @@ else
         mv "$INSTALL_DIR" "$BACKUP_DIR"
     fi
     
-    log_info "正在从 GitHub 克隆项目..."
+    log_info "正在从 GitHub 获取项目代码..."
     mkdir -p "$(dirname "$INSTALL_DIR")"
-    git clone "$REPO_URL" "$INSTALL_DIR"
-    log_ok "代码克隆完成"
+    
+    # 检测 SSH 克隆方式
+    if [ "$USE_SSH" = "yes" ]; then
+        log_info "使用 SSH 协议克隆..."
+        git clone "git@github.com:xzwangtao001/vllm-console.git" "$INSTALL_DIR" 2>&1 | tail -3
+    else
+        # 尝试 HTTPS 克隆
+        if ! git clone "$REPO_URL" "$INSTALL_DIR" 2>&1 | tail -3; then
+            log_warn "HTTPS 克隆失败，尝试下载压缩包..."
+            rm -rf "$INSTALL_DIR"
+            TMP_ZIP="/tmp/vllm-console-$(date +%s).zip"
+            curl -fsSL -o "$TMP_ZIP" "https://github.com/xzwangtao001/vllm-console/archive/refs/heads/main.zip" || {
+                log_error "下载失败，请检查网络连接或配置代理"
+                log_info "设置代理示例: export https_proxy=http://127.0.0.1:7890"
+                exit 1
+            }
+            mkdir -p "$INSTALL_DIR"
+            unzip -q "$TMP_ZIP" -d /tmp/vllm-extract
+            mv /tmp/vllm-extract/vllm-console-main/* "$INSTALL_DIR"/
+            mv /tmp/vllm-extract/vllm-console-main/.gitignore "$INSTALL_DIR"/ 2>/dev/null || true
+            rm -rf "$TMP_ZIP" /tmp/vllm-extract
+            log_ok "压缩包解压完成"
+        fi
+    fi
+    log_ok "代码获取完成"
 fi
 
 # -------------------------------------------------------
