@@ -46,18 +46,6 @@ export function checkEngine() {
   return post<{ task_id: number; task_type: string; status: string }>('/engine/check')
 }
 
-export function installEngine(data: { python_path?: string; venv_path?: string; install_args?: string }) {
-  return post('/engine/install', data)
-}
-
-export function upgradeEngine() {
-  return post('/engine/upgrade')
-}
-
-export function getEngineLogs(page = 1, page_size = 20) {
-  return get('/engine/logs', { page, page_size })
-}
-
 export function getTask(taskId: number) {
   return get<TaskInfo>(`/tasks/${taskId}`)
 }

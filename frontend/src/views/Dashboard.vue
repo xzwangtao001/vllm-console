@@ -49,7 +49,7 @@
           <el-card shadow="hover">
             <div class="card-content">
               <div class="card-icon instance">
-                <el-icon :size="32"><Document /></el-icon>
+                <el-icon :size="32"><Monitor /></el-icon>
               </div>
               <div class="card-info">
                 <div class="card-label">运行中实例</div>
@@ -102,7 +102,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Cpu, Monitor, Folder, Document } from '@element-plus/icons-vue'
+import { Cpu, Monitor, Folder } from '@element-plus/icons-vue'
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
 import { useEngineStore } from '@/stores/engine'
 

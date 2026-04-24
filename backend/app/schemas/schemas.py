@@ -1,6 +1,6 @@
 """Pydantic Schema 定义"""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Dict, Any
 from datetime import datetime
 
@@ -9,6 +9,7 @@ from datetime import datetime
 
 class EngineStatusResponse(BaseModel):
     """引擎状态响应"""
+    model_config = ConfigDict(protected_namespaces=())
     python_path: Optional[str] = None
     python_version: Optional[str] = None
     pip_version: Optional[str] = None
@@ -57,6 +58,7 @@ class ModelUpdate(BaseModel):
 
 class ModelResponse(BaseModel):
     """模型响应"""
+    model_config = ConfigDict(from_attributes=True)
     id: int
     name: str
     source_type: str
@@ -71,9 +73,6 @@ class ModelResponse(BaseModel):
     last_downloaded_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class ModelListResponse(BaseModel):
@@ -121,6 +120,7 @@ class InstanceUpdate(BaseModel):
 
 class InstanceResponse(BaseModel):
     """实例响应"""
+    model_config = ConfigDict(from_attributes=True)
     id: int
     name: str
     model_id: int
@@ -144,9 +144,6 @@ class InstanceResponse(BaseModel):
     last_health_check_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class InstanceListResponse(BaseModel):
@@ -161,6 +158,7 @@ class InstanceListResponse(BaseModel):
 
 class TaskResponse(BaseModel):
     """任务响应"""
+    model_config = ConfigDict(from_attributes=True)
     id: int
     task_type: str
     target_type: Optional[str] = None
@@ -173,9 +171,6 @@ class TaskResponse(BaseModel):
     finished_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class TaskListResponse(BaseModel):
@@ -218,6 +213,7 @@ class SettingsUpdate(BaseModel):
 
 class SystemSummaryResponse(BaseModel):
     """系统摘要响应"""
+    model_config = ConfigDict(protected_namespaces=())
     cpu_percent: float
     memory_percent: float
     disk_percent: float

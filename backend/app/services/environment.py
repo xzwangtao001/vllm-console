@@ -87,25 +87,27 @@ class EnvironmentService:
         try:
             smi_output = subprocess.run(
                 ["nvidia-smi", "--query-gpu=index,name,memory.total,memory.used,memory.free,utilization.gpu,temperature.gpu",
-                 "--format=json"],
+                 "--format=csv,noheader,nounits"],
                 capture_output=True,
                 text=True,
                 timeout=10
             )
             
             if smi_output.returncode == 0:
-                data = json.loads(smi_output.stdout)
                 gpus = []
-                for gpu in data.get("gpu", []):
-                    gpus.append({
-                        "index": int(gpu["index"]),
-                        "name": gpu["name"],
-                        "memory_total_mb": int(gpu["memory.total"].split()[0]),
-                        "memory_used_mb": int(gpu["memory.used"].split()[0]),
-                        "memory_free_mb": int(gpu["memory.free"].split()[0]),
-                        "utilization_gpu": int(gpu["utilization.gpu"].split()[0]),
-                        "temperature": int(gpu["temperature.gpu"].split()[0]),
-                    })
+                for line in smi_output.stdout.strip().split("\n"):
+                    if line:
+                        parts = [p.strip() for p in line.split(",")]
+                        if len(parts) >= 7:
+                            gpus.append({
+                                "index": int(parts[0]),
+                                "name": parts[1],
+                                "memory_total_mb": int(float(parts[2])),
+                                "memory_used_mb": int(float(parts[3])),
+                                "memory_free_mb": int(float(parts[4])),
+                                "utilization_gpu": int(float(parts[5])),
+                                "temperature": int(float(parts[6])),
+                            })
                 result["gpu_info"] = {"gpu_type": "nvidia", "gpus": gpus}
         except Exception as e:
             result["gpu_info"] = {"gpu_type": "nvidia", "gpus": [], "error": str(e)}

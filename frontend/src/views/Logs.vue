@@ -109,7 +109,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
@@ -141,7 +141,7 @@ const filteredInstances = computed(() => {
 // 过滤后的任务列表
 const filteredTasks = computed(() => {
   if (!taskSearch.value) return tasks.value
-  return tasks.value.filter(t => 
+  return tasks.value.filter((t: any) => 
     t.task_type.toLowerCase().includes(taskSearch.value.toLowerCase()) ||
     t.message?.toLowerCase().includes(taskSearch.value.toLowerCase())
   )
@@ -161,7 +161,7 @@ async function fetchInstances() {
 async function fetchTasks() {
   try {
     const res: any = await get('/tasks', { page_size: 100 })
-    tasks.value = res.data.items.filter(t => t.log_path)
+    tasks.value = res.data.items.filter((t: any) => t.log_path)
   } catch (error) {
     console.error('Failed to fetch tasks:', error)
   }
@@ -231,7 +231,7 @@ function scrollToBottom() {
 }
 
 // 处理滚动（自动加载更多）
-function handleScroll(event: any) {
+function handleScroll(_event: any) {
   // TODO: 实现滚动加载更多
 }
 
