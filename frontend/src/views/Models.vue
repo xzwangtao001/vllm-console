@@ -108,8 +108,8 @@
           
           <el-form-item label="来源类型" prop="source_type">
             <el-select v-model="addForm.source_type" style="width: 100%" @change="onSourceTypeChange">
-              <el-option label="HuggingFace" value="huggingface" />
               <el-option label="ModelScope" value="modelscope" />
+              <el-option label="HuggingFace" value="huggingface" />
               <el-option label="本地" value="local" />
             </el-select>
           </el-form-item>
@@ -169,7 +169,7 @@ const pagination = reactive({
 
 const addForm = reactive({
   name: '',
-  source_type: 'huggingface',
+  source_type: 'modelscope',
   source_repo: '',
   source_revision: 'main',
   remark: '',
@@ -182,10 +182,10 @@ const addRules: FormRules = {
 }
 
 const repoPlaceholder = computed(() => {
-  if (addForm.source_type === 'huggingface') {
-    return '例如：Qwen/Qwen3-8B'
-  } else if (addForm.source_type === 'modelscope') {
-    return '例如：qwen/Qwen3-8B'
+  if (addForm.source_type === 'modelscope') {
+    return '例如：Qwen/Qwen3.5-2B'
+  } else if (addForm.source_type === 'huggingface') {
+    return '例如：Qwen/Qwen3.5-2B'
   }
   return '本地路径'
 })
@@ -239,7 +239,7 @@ async function handleAddSubmit() {
       // 重置表单
       Object.assign(addForm, {
         name: '',
-        source_type: 'huggingface',
+        source_type: 'modelscope',
         source_repo: '',
         source_revision: 'main',
         remark: '',
@@ -256,10 +256,34 @@ async function handleAddSubmit() {
 async function handleAnalyze(row: any) {
   try {
     const res: any = await post(`/models/${row.id}/analyze`)
-    ElMessage.success(`分析任务已创建 (ID: ${res.data.task_id})`)
-    setTimeout(fetchModels, 2000)
-  } catch (error) {
-    ElMessage.error('分析失败')
+    const taskId = res.data.task_id
+    ElMessage.info(`正在分析模型，请稍候...`)
+    
+    // 轮询任务状态直到完成
+    const checkTask = async () => {
+      try {
+        const taskRes: any = await get(`/tasks/${taskId}`)
+        const task = taskRes.data
+        
+        if (task.status === 'success') {
+          ElMessage.success('分析完成')
+          fetchModels()
+          return
+        }
+        if (task.status === 'failed') {
+          ElMessage.error(`分析失败: ${task.message || '未知错误'}`)
+          fetchModels()
+          return
+        }
+        // 继续轮询
+        setTimeout(checkTask, 1000)
+      } catch {
+        setTimeout(checkTask, 2000)
+      }
+    }
+    checkTask()
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.message || '分析失败')
   }
 }
 
