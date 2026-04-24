@@ -1,6 +1,5 @@
 import { get, post } from './request'
 
-// 引擎状态响应类型
 export interface EngineStatus {
   python_path: string | null
   python_version: string | null
@@ -27,27 +26,46 @@ export interface EngineStatus {
   last_checked_at: string | null
 }
 
-// 获取引擎状态
+export interface TaskInfo {
+  id: number
+  task_type: string
+  status: string
+  progress: number
+  message: string | null
+  log_path: string | null
+  created_at: string
+  started_at: string | null
+  finished_at: string | null
+}
+
 export function getEngineStatus() {
   return get<EngineStatus>('/engine/status')
 }
 
-// 触发环境检测
 export function checkEngine() {
   return post<{ task_id: number; task_type: string; status: string }>('/engine/check')
 }
 
-// 安装 vLLM
 export function installEngine(data: { python_path?: string; venv_path?: string; install_args?: string }) {
   return post('/engine/install', data)
 }
 
-// 升级 vLLM
 export function upgradeEngine() {
   return post('/engine/upgrade')
 }
 
-// 获取引擎日志列表
 export function getEngineLogs(page = 1, page_size = 20) {
   return get('/engine/logs', { page, page_size })
+}
+
+export function getTask(taskId: number) {
+  return get<TaskInfo>(`/tasks/${taskId}`)
+}
+
+export function getTasks(params?: { page?: number; page_size?: number; status?: string; task_type?: string }) {
+  return get('/tasks', params)
+}
+
+export function cancelTask(taskId: number) {
+  return post(`/tasks/${taskId}/cancel`)
 }

@@ -180,28 +180,53 @@ class TaskScheduler:
     
     async def _run_engine_install(self, task: Task, db: AsyncSession):
         """执行 vLLM 安装任务"""
+        import json
+        payload = json.loads(task.payload_json) if task.payload_json else {}
+        
+        python_path = payload.get("python_path", "python3")
+        venv_path = payload.get("venv_path", "")
+        install_args = payload.get("install_args", "")
+        
+        # Determine pip command
+        if venv_path:
+            pip_cmd = f"{venv_path}/bin/pip"
+            python_cmd = f"{venv_path}/bin/python"
+        else:
+            pip_cmd = f"{python_path} -m pip"
+            python_cmd = python_path
+        
         task.message = "Installing vLLM..."
-        task.progress = 20
+        task.progress = 10
         await db.commit()
         
-        # 实际安装逻辑（简化版）
         log_dir = os.path.join(os.path.dirname(__file__), "../../data/logs/engine")
         os.makedirs(log_dir, exist_ok=True)
         log_path = os.path.join(log_dir, f"install_{task.id}.log")
         task.log_path = log_path
         
-        # 执行 pip install
+        cmd = f"{pip_cmd} install vllm {install_args}"
+        task.message = f"Running: {pip_cmd} install vllm"
+        await db.commit()
+        
         try:
             proc = await asyncio.create_subprocess_shell(
-                "pip install vllm",
+                cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
             )
             
+            downloaded = 0
             with open(log_path, "w") as log_file:
                 async for line in proc.stdout:
-                    log_file.write(line.decode())
+                    decoded = line.decode(errors="replace")
+                    log_file.write(decoded)
                     log_file.flush()
+                    
+                    # Parse pip download progress
+                    if "Downloading" in decoded or "Collecting" in decoded:
+                        task.progress = min(90, task.progress + 1)
+                        task.message = decoded.strip()[:100]
+                        await db.commit()
             
             await proc.wait()
             
