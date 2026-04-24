@@ -4,7 +4,7 @@ set -e
 # =====================================================
 # vLLM Console 一键安装脚本
 # 用法: bash -c "$(curl -fsSL https://raw.githubusercontent.com/xzwangtao001/vllm-console/main/install.sh)"
-# 或: ./install.sh [安装目录]
+# 或: sudo ./install.sh [安装目录]
 # =====================================================
 
 RED='\033[0;31m'
@@ -16,6 +16,7 @@ NC='\033[0m' # No Color
 INSTALL_DIR="${1:-/opt/vllm-console}"
 REPO_URL="https://github.com/xzwangtao001/vllm-console.git"
 ENABLE_SYSTEMD="${ENABLE_SYSTEMD:-auto}"  # auto/yes/no
+VLLM_VERSION="${VLLM_VERSION:-0.19.1}"
 
 # 解析命令行参数
 for arg in "$@"; do
@@ -23,6 +24,7 @@ for arg in "$@"; do
         --systemd) ENABLE_SYSTEMD="yes" ;;
         --no-systemd) ENABLE_SYSTEMD="no" ;;
         --install-dir=*) INSTALL_DIR="${arg#*=}" ;;
+        --vllm-version=*) VLLM_VERSION="${arg#*=}" ;;
     esac
 done
 
@@ -124,10 +126,46 @@ fi
 source venv/bin/activate
 pip install --upgrade pip -q
 pip install -r requirements.txt -q
-log_ok "后端依赖安装完成: $(pip list 2>/dev/null | grep -iE 'fastapi|uvicorn' | tr '\n' ', ')"
+log_ok "后端依赖安装完成"
 
 # -------------------------------------------------------
-# 4. 安装前端并构建
+# 4. 安装 vLLM 引擎（一次性安装，版本固定）
+# -------------------------------------------------------
+echo ""
+log_info "安装 vLLM 引擎 (v$VLLM_VERSION)..."
+
+# 检测环境选择正确的 vLLM 版本
+if nvidia-smi &> /dev/null; then
+    # NVIDIA GPU - 检查 CUDA 版本
+    CUDA_VERSION=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1 | awk -F. '{print $1}' || echo "12")
+    log_info "检测到 NVIDIA GPU，CUDA 驱动版本: $CUDA_VERSION"
+    CUDA_MAJOR=$(echo "$CUDA_VERSION" | head -c 2)
+    
+    # 安装 vLLM（CPU 模式跳过）
+    pip install "vllm==$VLLM_VERSION" -q 2>&1 | tail -5
+    log_ok "vLLM $VLLM_VERSION 安装完成"
+    
+    # 显示版本信息
+    VLLM_ACTUAL=$(pip show vllm 2>/dev/null | grep "^Version:" | awk '{print $2}')
+    TORCH_VERSION=$(pip show torch 2>/dev/null | grep "^Version:" | awk '{print $2}')
+    log_ok "vLLM: $VLLM_ACTUAL | torch: $TORCH_VERSION"
+    
+    # GPU 信息
+    GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)
+    GPU_MEM=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader | head -1)
+    log_ok "GPU: $GPU_NAME ($GPU_MEM)"
+    
+elif command -v rocm-smi &> /dev/null; then
+    log_warn "AMD ROCm 环境 - vLLM ROCm 支持需要额外配置"
+    log_info "建议参考: https://docs.vllm.ai/en/latest/getting_started/amd-installation.html"
+else
+    log_info "未检测到 GPU，安装 CPU 版本 vLLM..."
+    pip install "vllm==$VLLM_VERSION" -q 2>&1 | tail -5
+    log_ok "vLLM CPU 版本安装完成"
+fi
+
+# -------------------------------------------------------
+# 5. 安装前端并构建
 # -------------------------------------------------------
 echo ""
 log_info "安装前端依赖..."
@@ -142,13 +180,13 @@ npm run build 2>&1 | tail -3
 log_ok "前端构建完成"
 
 # -------------------------------------------------------
-# 5. 创建日志目录
+# 6. 创建日志目录
 # -------------------------------------------------------
 mkdir -p "$INSTALL_DIR/logs"
 log_ok "日志目录: $INSTALL_DIR/logs"
 
 # -------------------------------------------------------
-# 6. 配置服务启动脚本
+# 7. 配置服务启动脚本
 # -------------------------------------------------------
 echo ""
 log_info "配置启动脚本..."
@@ -165,9 +203,14 @@ echo -e "\033[0;34m==============================================\033[0m"
 echo -e "\033[0;34m  🚀 Starting vLLM Console\033[0m"
 echo -e "\033[0;34m==============================================\033[0m"
 
-# 检查端口是否已被占用
-if ss -tlnp | grep -q ":3000 "; then
+# 检查端口是否已被占用（使用 lsof，WSL2 兼容）
+if command -v lsof &> /dev/null && lsof -i :3000 -sTCP:LISTEN > /dev/null 2>&1; then
     echo -e "\033[1;33m[!] 端口 3000 已被占用，请先运行 ./stop.sh\033[0m"
+    lsof -i :3000 -sTCP:LISTEN
+    exit 1
+elif command -v ss &> /dev/null && ss -tlnp 2>/dev/null | grep -q ":3000 "; then
+    # 降级方案：lsof 不可用时用 ss
+    echo -e "\033[1;33m[!] 端口 3000 可能被占用\033[0m"
     exit 1
 fi
 
@@ -180,20 +223,23 @@ BACKEND_PID=$!
 echo -e "\033[0;32m[✓] Backend started (PID: $BACKEND_PID)\033[0m"
 
 # 等待后端启动
-sleep 2
-if kill -0 $BACKEND_PID 2>/dev/null; then
+sleep 3
+if curl -sf http://localhost:3000/health > /dev/null 2>&1; then
     echo ""
     echo -e "\033[0;34m==============================================\033[0m"
     echo -e "\033[0;32m  🎉 Service started successfully!\033[0m"
     echo -e "\033[0;34m==============================================\033[0m"
     echo ""
-    echo -e "  📊 API Docs: \033[0;34mhttp://localhost:3000/docs\033[0m"
-    echo -e "  🌐 Frontend: \033[0;34mhttp://localhost:3001\033[0m (dev mode)"
+    # 获取本机 IP
+    LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
+    echo -e "  🌐 Frontend: \033[0;34mhttp://$LOCAL_IP:3000\033[0m"
+    echo -e "  📊 API Docs: \033[0;34mhttp://$LOCAL_IP:3000/docs\033[0m"
     echo -e "  📝 Backend Log: \033[0;36m$INSTALL_DIR/logs/backend.log\033[0m"
     echo -e "  🛑 Stop: \033[0;36m./stop.sh\033[0m"
     echo ""
 else
     echo -e "\033[0;31m[✗] Backend failed to start. Check logs: $INSTALL_DIR/logs/backend.log\033[0m"
+    cat "$INSTALL_DIR/logs/backend.log" | tail -20
     exit 1
 fi
 START_EOF
@@ -226,7 +272,7 @@ chmod +x "$INSTALL_DIR/start.sh" "$INSTALL_DIR/stop.sh"
 log_ok "启动脚本配置完成"
 
 # -------------------------------------------------------
-# 7. 创建 systemd 服务（可选）
+# 8. 创建 systemd 服务（可选）
 # -------------------------------------------------------
 echo ""
 
