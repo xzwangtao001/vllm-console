@@ -125,7 +125,11 @@ else
                 exit 1
             }
             mkdir -p "$INSTALL_DIR"
-            unzip -q "$TMP_ZIP" -d /tmp/vllm-extract
+            python3 -c "
+import zipfile, os
+with zipfile.ZipFile('$TMP_ZIP', 'r') as z:
+    z.extractall('/tmp/vllm-extract')
+"
             mv /tmp/vllm-extract/vllm-console-main/* "$INSTALL_DIR"/
             mv /tmp/vllm-extract/vllm-console-main/.gitignore "$INSTALL_DIR"/ 2>/dev/null || true
             rm -rf "$TMP_ZIP" /tmp/vllm-extract
