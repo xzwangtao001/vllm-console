@@ -57,17 +57,18 @@
               {{ formatSize(row.local_size_bytes) }}
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="280" fixed="right">
+          <el-table-column label="操作" width="340" fixed="right">
             <template #default="{ row }">
               <el-button size="small" @click="handleAnalyze(row)">分析</el-button>
               <el-button 
                 size="small" 
                 type="primary"
-                :disabled="row.status !== 'ready_to_download' && row.status !== 'error'"
+                :disabled="row.status !== 'ready_to_download' && row.status !== 'error' && row.status !== 'analyzing'"
                 @click="handleDownload(row)"
               >
                 下载
               </el-button>
+              <el-button size="small" type="warning" @click="handleEdit(row)">编辑</el-button>
               <el-button 
                 size="small" 
                 type="success"
@@ -138,6 +139,50 @@
           <el-button type="primary" :loading="adding" @click="handleAddSubmit">确定</el-button>
         </template>
       </el-dialog>
+      
+      <!-- 编辑模型对话框 -->
+      <el-dialog
+        v-model="showEditDialog"
+        title="编辑模型"
+        width="600px"
+      >
+        <el-form :model="editForm" label-width="120px" :rules="editRules" ref="editFormRef">
+          <el-form-item label="模型名称" prop="name">
+            <el-input v-model="editForm.name" placeholder="Qwen3-8B" />
+          </el-form-item>
+          
+          <el-form-item label="来源类型" prop="source_type">
+            <el-select v-model="editForm.source_type" style="width: 100%" @change="onEditSourceTypeChange">
+              <el-option label="ModelScope" value="modelscope" />
+              <el-option label="HuggingFace" value="huggingface" />
+              <el-option label="本地" value="local" />
+            </el-select>
+          </el-form-item>
+          
+          <el-form-item label="仓库 ID" prop="source_repo">
+            <el-input v-model="editForm.source_repo" :placeholder="editRepoPlaceholder" />
+          </el-form-item>
+          
+          <el-form-item label="分支/版本">
+            <el-input v-model="editForm.source_revision" placeholder="main" />
+          </el-form-item>
+          
+          <el-form-item label="存储路径">
+            <el-text type="info" size="small">
+              data/models/{{ editForm.source_type }}/{{ editForm.name || '模型名称' }}
+            </el-text>
+          </el-form-item>
+          
+          <el-form-item label="备注">
+            <el-input v-model="editForm.remark" type="textarea" :rows="2" />
+          </el-form-item>
+        </el-form>
+        
+        <template #footer>
+          <el-button @click="showEditDialog = false">取消</el-button>
+          <el-button type="primary" :loading="editing" @click="handleEditSubmit">保存</el-button>
+        </template>
+      </el-dialog>
     </div>
   </default-layout>
 </template>
@@ -146,15 +191,19 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
-import { get, post, del } from '@/api/request'
+import { get, post, put, del } from '@/api/request'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
 const loading = ref(false)
 const adding = ref(false)
+const editing = ref(false)
 const showAddDialog = ref(false)
+const showEditDialog = ref(false)
 const addFormRef = ref<FormInstance>()
+const editFormRef = ref<FormInstance>()
+const editingModelId = ref<number | null>(null)
 
 const searchKeyword = ref('')
 const filterStatus = ref('')
@@ -181,10 +230,33 @@ const addRules: FormRules = {
   source_repo: [{ required: true, message: '请输入仓库 ID', trigger: 'blur' }],
 }
 
+const editForm = reactive({
+  name: '',
+  source_type: 'modelscope',
+  source_repo: '',
+  source_revision: 'main',
+  remark: '',
+})
+
+const editRules: FormRules = {
+  name: [{ required: true, message: '请输入模型名称', trigger: 'blur' }],
+  source_type: [{ required: true, message: '请选择来源类型', trigger: 'change' }],
+  source_repo: [{ required: true, message: '请输入仓库 ID', trigger: 'blur' }],
+}
+
 const repoPlaceholder = computed(() => {
   if (addForm.source_type === 'modelscope') {
     return '例如：Qwen/Qwen3.5-2B'
   } else if (addForm.source_type === 'huggingface') {
+    return '例如：Qwen/Qwen3.5-2B'
+  }
+  return '本地路径'
+})
+
+const editRepoPlaceholder = computed(() => {
+  if (editForm.source_type === 'modelscope') {
+    return '例如：Qwen/Qwen3.5-2B'
+  } else if (editForm.source_type === 'huggingface') {
     return '例如：Qwen/Qwen3.5-2B'
   }
   return '本地路径'
@@ -248,6 +320,45 @@ async function handleAddSubmit() {
       ElMessage.error('添加失败')
     } finally {
       adding.value = false
+    }
+  })
+}
+
+// 打开编辑对话框
+function handleEdit(row: any) {
+  editingModelId.value = row.id
+  Object.assign(editForm, {
+    name: row.name,
+    source_type: row.source_type,
+    source_repo: row.source_repo,
+    source_revision: row.source_revision || 'main',
+    remark: row.remark || '',
+  })
+  showEditDialog.value = true
+}
+
+// 编辑时来源类型变化
+function onEditSourceTypeChange() {
+  editForm.source_repo = ''
+}
+
+// 提交编辑
+async function handleEditSubmit() {
+  if (!editFormRef.value || editingModelId.value === null) return
+  
+  await editFormRef.value.validate(async (valid) => {
+    if (!valid) return
+    
+    editing.value = true
+    try {
+      await put(`/models/${editingModelId.value}`, editForm)
+      ElMessage.success('模型修改成功')
+      showEditDialog.value = false
+      fetchModels()
+    } catch (error: any) {
+      ElMessage.error(error.response?.data?.message || '修改失败')
+    } finally {
+      editing.value = false
     }
   })
 }

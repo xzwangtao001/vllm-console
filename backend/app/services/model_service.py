@@ -155,6 +155,12 @@ class ModelService:
         for key, value in update_data.items():
             setattr(model, key, value)
         
+        # 如果名称或来源类型改变，重新生成本地路径
+        if data.name is not None or data.source_type is not None:
+            new_name = data.name or model.name
+            new_source_type = data.source_type or model.source_type
+            model.local_path = get_model_local_path(new_name, new_source_type)
+        
         await self.db.commit()
         return True
     

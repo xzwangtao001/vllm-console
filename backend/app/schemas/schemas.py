@@ -49,6 +49,7 @@ class ModelCreate(BaseModel):
 class ModelUpdate(BaseModel):
     """更新模型请求"""
     name: Optional[str] = None
+    source_type: Optional[str] = Field(None, pattern="^(huggingface|modelscope|local)$")
     source_repo: Optional[str] = None
     source_revision: Optional[str] = None
     remark: Optional[str] = None
