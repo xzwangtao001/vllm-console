@@ -286,22 +286,32 @@ class ModelService:
             raise ValueError(f"Failed to fetch HuggingFace info: {e}")
     
     async def _fetch_ms_meta(self, repo: str, revision: str = "main") -> Dict[str, Any]:
-        """获取 ModelScope 模型元信息"""
+        """获取 ModelScope 模型元信息 — 直接使用 HTTP API，不依赖 SDK 版本"""
+        import httpx
         try:
-            from modelscope.hub.api import HubApi
-            api = HubApi()
+            # ModelScope 公开 API
+            url = f"https://modelscope.cn/api/v1/models/{repo}"
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                data = resp.json()
             
-            # 获取模型信息
-            model_info = api.get_model_info(repo, revision=revision)
+            if data.get("code") != 0:
+                raise ValueError(f"ModelScope API error: {data.get('message', 'Unknown')}")
             
+            model_data = data.get("data", {})
             return {
                 "source": "modelscope",
                 "repo": repo,
                 "revision": revision,
-                "tasks": model_info.get("tasks", []),
-                "framework": model_info.get("framework", []),
-                "license": model_info.get("license", ""),
+                "tasks": model_data.get("tasks", []),
+                "framework": model_data.get("framework", []),
+                "license": model_data.get("license", ""),
+                "name": model_data.get("name", ""),
+                "description": model_data.get("description", ""),
             }
+        except httpx.HTTPError as e:
+            raise ValueError(f"Failed to fetch ModelScope info (HTTP error): {e}")
         except Exception as e:
             raise ValueError(f"Failed to fetch ModelScope info: {e}")
     
